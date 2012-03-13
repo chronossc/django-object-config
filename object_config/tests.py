@@ -6,7 +6,9 @@ unittest). These will both pass when you run "manage.py test".
 Replace these with more appropriate tests for your application.
 """
 from django.contrib.contenttypes import generic
+from django.core.cache import cache
 from django.db import models, IntegrityError
+from django.db.models import ObjectDoesNotExist
 from django.test import TestCase
 from object_config.models import Option, OPT_TYPES
 from decimal import Decimal
@@ -79,7 +81,7 @@ class OptionsTest(TestCase):
                 'verbose_name':'Allow new documents',
                 'help_text':'If checked allow you add new documents.',
                 'type': 5, # bool
-                'default_value': False
+                'default_value': '0'
             },
         ]
 
@@ -93,7 +95,7 @@ class OptionsTest(TestCase):
         self.assertEquals('100',option.opt_value)
 
     def test_option_creation_float(self):
-        """ Test creation of one option and duplicate key rule for float """
+        """ Test creation of one option for float """
         opts = self.options[1].copy()
         option = self.model.options.create(**opts)
         self.assertEquals(0.45,option.value)
@@ -102,7 +104,7 @@ class OptionsTest(TestCase):
         self.assertEquals('0.6555559',option.opt_value)
 
     def test_option_creation_decimals(self):
-        """ Test creation of one option and duplicate key rule for decimals """
+        """ Test creation of one option for decimals """
         opts = self.options[2].copy()
         option = self.model.options.create(**opts)
         self.assertEquals(Decimal('3.1415927'),option.value)
@@ -111,7 +113,7 @@ class OptionsTest(TestCase):
         self.assertEquals('3.141592653',option.opt_value)
 
     def test_option_creation_string(self):
-        """ Test creation of one option and duplicate key rule for integers """
+        """ Test creation of one option for integers """
         opts = self.options[3].copy()
         option = self.model.options.create(**opts)
         self.assertEquals("{{ user.get_full_name }}\n{{ user.get_profile.company }} - {{ user.get_profile.departament }}",option.value)
@@ -120,7 +122,7 @@ class OptionsTest(TestCase):
         self.assertEquals("{{ user.get_full_name }}\n{{ user.get_profile.company }} - {{ user.get_profile.departament }}\nMobile: {{ user.get_profile.mobile }}",option.opt_value)
 
     def test_option_creation_json(self):
-        """ Test creation of one option and duplicate key rule for integers """
+        """ Test creation of one option for json """
         opts = self.options[4].copy()
         option = self.model.options.create(**opts)
         self.assertEquals({'allowed_apps':['djangoool','webmail','tickets','bike shop']},option.value)
@@ -128,7 +130,79 @@ class OptionsTest(TestCase):
         self.assertEquals({'allowed_apps':['djangoool','webmail','tickets','bike shop'],'last_login':str(datetime.datetime(2012,3,8,13,21))},option.value)
         self.assertEquals('{"allowed_apps": ["djangoool", "webmail", "tickets", "bike shop"], "last_login": "2012-03-08 13:21:00"}',option.opt_value)
 
+    def test_option_creation_bool(self):
+        """ Test creation of one option for booleans """
+        opts = self.options[5].copy()
+        option = self.model.options.create(**opts)
+        self.assertEquals(False,option.value)
+        self.assertEquals('0',option.opt_value)
+        option.value = True
+        self.assertEquals(True,option.value)
+        self.assertEquals('1',option.opt_value)
+
     def test_option_duplicate_key(self):
+        """ Test duplicate key creation """
         opts = self.options[0].copy()
         self.model.options.create(**opts)
         self.assertRaises(IntegrityError,self.model.options.create,**opts)
+
+    def test_option_create_many(self):
+        """ Test many items creation """
+
+        created = self.model.options.create_many(self.options)
+        self.assertEquals(len(created),self.model.options.count())
+
+        #  check each instance
+        self.assertEquals(50,
+            self.model.options.get(name=self.options[0]['name']).value)
+        self.assertEquals(0.45,
+            self.model.options.get(name=self.options[1]['name']).value)
+        self.assertEquals(Decimal('3.1415927'),
+            self.model.options.get(name=self.options[2]['name']).value)
+        self.assertEquals("{{ user.get_full_name }}\n{{ user.get_profile.company }} - {{ user.get_profile.departament }}",
+            self.model.options.get(name=self.options[3]['name']).value)
+        self.assertEquals({'allowed_apps':['djangoool','webmail','tickets','bike shop']},
+            self.model.options.get(name=self.options[4]['name']).value)
+        self.assertEquals(False,self.model.options.get(name=self.options[5]['name']).value)
+
+    def test_option_create_many_failed(self):
+        """ Test create_maby failure. Any entrie of options dict that is sent should be in database. """
+        options = list(self.options)
+        options.append(options[0])
+
+        self.assertRaises(IntegrityError,self.model.options.create_many,options)
+
+        for opt in options:
+            self.assertRaises(Option.DoesNotExist,self.model.options.get,name=opt['name'])
+
+    def test_options_cache(self):
+
+        created = self.model.options.create_many(self.options)
+        keys = [i.cache_key for i in created]
+
+        # it should not be cached yet
+        for key in keys:
+            self.assertEquals(False,cache.has_key(key))
+
+        for opt in created:
+            opt.value
+            self.assertEquals(True,cache.has_key(opt.cache_key))
+            self.assertEquals(opt.value,cache.get(opt.cache_key))
+
+    def test_options_get_all_cached(self):
+
+        created = self.model.options.create_many(self.options)
+        keys = [i.cache_key for i in created]
+
+        # it should not be cached yet
+        for key in keys:
+            self.assertEquals(False,cache.has_key(key))
+
+        opt_dict = self.model.options.get_all_cached()
+
+        for key in keys:
+            self.assertEquals(True,cache.has_key(key))
+            self.assertEquals(opt_dict[key.split('-')[-1]],cache.get(key))
+
+    def tearDown(self):
+        cache.clear()

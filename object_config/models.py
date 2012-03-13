@@ -1,8 +1,9 @@
 # coding: utf-8
 
-from django.db import models
+from django.core.cache import cache
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
+from django.db import models, transaction, IntegrityError
 from decimal import Decimal, DecimalException
 from django.utils.translation import ugettext as _
 from django.template.defaultfilters import slugify
@@ -27,6 +28,40 @@ class OptionManager(models.Manager):
 
     def get_option(self,name):
         return self.get(name=name)
+
+    def create_many(self,items):
+        """ Create many entries based on a list of dictionarys """
+
+        # since transactions not work in MyISAM, let's do our way.
+        # 'transactions' here is important because who normally wil use this
+        # method is developer when create a model entry and need to setup default
+        # options.
+        created=[]
+
+        for item in items:
+            try:
+                created.append(self.create(**item))
+            except IntegrityError, err:
+                [i.delete() for i in created]
+                raise IntegrityError, "%s. ALL CREATED ITEMS ARE REMOVED." % err
+
+        return self.get_query_set().filter(pk__in=[i.id for i in created])
+
+    def get_all_cached(self):
+        """ Be smart and use it with something model.options.get_all_cached() to not cache ALL options in base """
+        values = self.values_list('pk','content_type','object_id','name')
+        key_template='doc_arquivo__%s-%s-%s'
+
+        result={}
+
+        for pk,content_type_id,object_id,name in values:
+            key = key_template % (content_type_id,object_id,name)
+            if cache.has_key(key):
+                result[name]=cache.get(key)
+            else:
+                result[name]=Option.objects.get(pk=pk).value # this cache parsed value
+
+        return result
 
 class Option(models.Model):
 
@@ -90,20 +125,37 @@ class Option(models.Model):
     verbose_name = models.CharField(max_length=100)
     help_text = models.CharField(max_length=255,default='',blank=True)
     type = models.PositiveIntegerField(choices=OPT_TYPES)
-    opt_value = models.TextField(default='',blank=True)
-    default_value = models.TextField(default='',blank=True)
+    opt_value = models.TextField(default=None,null=True,blank=True)
+    default_value = models.TextField(default=None,null=True,blank=True)
 
     objects = OptionManager()
+
+    _key = None# doc_arquivo__content_type_id-object_id-name
+
+    @property
+    def cache_key(self):
+        if not self._key and self.content_type_id and self.object_id and self.name:
+            # if change how key is made CHANGE MANAGER TOO
+            self._key='doc_arquivo__%s-%s-%s' % (self.content_type_id,self.object_id,self.name)
+
+        if not self._key: return None
+
+        return self._key
 
     class Meta:
         unique_together = ('content_type','object_id','name')
 
     def __unicode__(self):
-        return u"%s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
+        return u"doc_arquivo_%s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
 
     def _get_value(self):
-        if not self.opt_value:
+
+        if self.cache_key and cache.has_key(self.cache_key):
+            return cache.get(self.cache_key)
+
+        if self.opt_value is None:
             return None
+
         f = None
         if self.type == 0:
             f = int
@@ -114,22 +166,25 @@ class Option(models.Model):
         if self.type == 3:
             f = lambda s: u"%s" % s
         if self.type == 4:
-            # import ipdb
-            # ipdb.set_trace()
             f = lambda s:  simplejson.loads(s) if s else {}
         if self.type == 5:
-            f = bool
+            f = lambda s: bool(int(s))
 
         if f is None:
             raise TypeError,u"Unknow type set."
 
-        return f(self.opt_value or self.default_value)
+        value = f(self.opt_value or self.default_value)
+
+        cache.set(self.cache_key,value,3600)
+
+        return value
 
     def _set_value(self,value):
+        cache.delete(self.cache_key)
         if self.type == 4:
             self.opt_value = simplejson.dumps(value)
         elif self.type == 5:
-            self.opt_value = 1 if bool(value) else 0
+            self.opt_value = '1' if bool(int(value)) else '0'
         else:
             self.opt_value = u"%s" % value
         self.save()
@@ -138,6 +193,7 @@ class Option(models.Model):
 
     def save(self,*args,**kwargs):
         self.name = slugify(self.name)
-        if not self.opt_value:
+
+        if self.opt_value in ('',None) and self.default_value not in ('',None):
             self.opt_value = self.default_value
         super(Option,self).save(*args,**kwargs)
