@@ -48,7 +48,12 @@ class OptionManager(models.Manager):
         return self.get_query_set().filter(pk__in=[i.id for i in created])
 
     def get_all_cached(self):
-        """ Be smart and use it with something model.options.get_all_cached() to not cache ALL options in base """
+        """ Returns a dictonary of option_name: option_value entries. Returned value is parsed and cached.
+        Be smart and use it with something model.options.get_all_cached(). Use like Options.objects.get_all_cached() will raise AttributeError """
+
+        if self.__class__.__name__ != 'GenericRelatedObjectManager':
+            raise AttributeError,u"This method can't be called from a normal Manager. This method should be called from a GenericRelatedObjectManager, in other words, use mode.options.get_all_cached()"
+
         values = self.values_list('pk','content_type','object_id','name')
         key_template='doc_arquivo__%s-%s-%s'
 
@@ -62,6 +67,24 @@ class OptionManager(models.Manager):
                 result[name]=Option.objects.get(pk=pk).value # this cache parsed value
 
         return result
+
+    def set_val(self,name,value):
+        """ Set value for a option without need to get options """
+
+        if self.__class__.__name__ != 'GenericRelatedObjectManager':
+            raise AttributeError,u"This method can't be called from a normal Manager. This method should be called from a GenericRelatedObjectManager, in other words, use mode.options.set_val(name,value)"
+
+        self.get(name=name).value = value
+
+    def set_val_many(self,values_list):
+        """ Set values for many options without need to get options """
+
+        if self.__class__.__name__ != 'GenericRelatedObjectManager':
+            raise AttributeError,u"This method can't be called from a normal Manager. This method should be called from a GenericRelatedObjectManager, in other words, use mode.options.set_val_many([(name,val),(name,val),(name,val)])"
+
+        for name,value in values_list:
+            self.set_val(name,value)
+
 
 class Option(models.Model):
 

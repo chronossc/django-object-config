@@ -198,11 +198,61 @@ class OptionsTest(TestCase):
         for key in keys:
             self.assertEquals(False,cache.has_key(key))
 
+        self.assertRaises(AttributeError,Option.objects.get_all_cached)
+
         opt_dict = self.model.options.get_all_cached()
 
         for key in keys:
             self.assertEquals(True,cache.has_key(key))
             self.assertEquals(opt_dict[key.split('-')[-1]],cache.get(key))
+
+    def test_options_set_val(self):
+        self.model.options.create(**self.options[0])
+        self.assertEquals(50,self.model.options.get(name=self.options[0]['name']).value)
+        self.model.options.set_val(self.options[0]['name'],100)
+        self.assertEquals(100,self.model.options.get(name=self.options[0]['name']).value)
+
+    def test_options_set_val_many(self):
+
+        created = self.model.options.create_many(self.options)
+
+        # check original values
+        self.assertEquals(50,
+            self.model.options.get(name=self.options[0]['name']).value)
+        self.assertEquals(0.45,
+            self.model.options.get(name=self.options[1]['name']).value)
+        self.assertEquals(Decimal('3.1415927'),
+            self.model.options.get(name=self.options[2]['name']).value)
+        self.assertEquals("{{ user.get_full_name }}\n{{ user.get_profile.company }} - {{ user.get_profile.departament }}",
+            self.model.options.get(name=self.options[3]['name']).value)
+        self.assertEquals({'allowed_apps':['djangoool','webmail','tickets','bike shop']},
+            self.model.options.get(name=self.options[4]['name']).value)
+        self.assertEquals(False,self.model.options.get(name=self.options[5]['name']).value)
+
+        # update values
+        self.model.options.set_val_many([
+            (self.options[0]['name'],100),
+            (self.options[1]['name'],1.45),
+            (self.options[2]['name'],Decimal('3.1415927543235')),
+            (self.options[3]['name'],"{{ user.first_name }}\n{{ user.get_profile.company }} - {{ user.get_profile.departament }}"),
+            (self.options[4]['name'],{'allowed_apps':['djangoool','webmail','tickets']}),
+            (self.options[5]['name'],True),
+        ])
+
+        # check new values
+        self.assertEquals(100,
+            self.model.options.get(name=self.options[0]['name']).value)
+        self.assertEquals(1.45,
+            self.model.options.get(name=self.options[1]['name']).value)
+        self.assertEquals(Decimal('3.1415927543235'),
+            self.model.options.get(name=self.options[2]['name']).value)
+        self.assertEquals("{{ user.first_name }}\n{{ user.get_profile.company }} - {{ user.get_profile.departament }}",
+            self.model.options.get(name=self.options[3]['name']).value)
+        self.assertEquals({'allowed_apps':['djangoool','webmail','tickets']},
+            self.model.options.get(name=self.options[4]['name']).value)
+        self.assertEquals(True,
+            self.model.options.get(name=self.options[5]['name']).value)
+
 
     def tearDown(self):
         cache.clear()
