@@ -14,10 +14,11 @@ class Migration(SchemaMigration):
             ('content_type', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['contenttypes.ContentType'])),
             ('object_id', self.gf('django.db.models.fields.PositiveIntegerField')()),
             ('name', self.gf('django.db.models.fields.SlugField')(max_length=255, db_index=True)),
-            ('verbose', self.gf('django.db.models.fields.CharField')(max_length=100)),
-            ('help_text', self.gf('django.db.models.fields.CharField')(max_length=255)),
+            ('verbose_name', self.gf('django.db.models.fields.CharField')(max_length=100)),
+            ('help_text', self.gf('django.db.models.fields.CharField')(default='', max_length=255, blank=True)),
             ('type', self.gf('django.db.models.fields.PositiveIntegerField')()),
             ('opt_value', self.gf('django.db.models.fields.TextField')(default='', blank=True)),
+            ('default_value', self.gf('django.db.models.fields.TextField')(default='', blank=True)),
         ))
         db.send_create_signal('object_config', ['Option'])
 
@@ -45,13 +46,14 @@ class Migration(SchemaMigration):
         'object_config.option': {
             'Meta': {'unique_together': "(('content_type', 'object_id', 'name'),)", 'object_name': 'Option'},
             'content_type': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['contenttypes.ContentType']"}),
-            'help_text': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
+            'default_value': ('django.db.models.fields.TextField', [], {'default': "''", 'blank': 'True'}),
+            'help_text': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '255', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'name': ('django.db.models.fields.SlugField', [], {'max_length': '255', 'db_index': 'True'}),
             'object_id': ('django.db.models.fields.PositiveIntegerField', [], {}),
             'opt_value': ('django.db.models.fields.TextField', [], {'default': "''", 'blank': 'True'}),
             'type': ('django.db.models.fields.PositiveIntegerField', [], {}),
-            'verbose': ('django.db.models.fields.CharField', [], {'max_length': '100'})
+            'verbose_name': ('django.db.models.fields.CharField', [], {'max_length': '100'})
         }
     }
 
