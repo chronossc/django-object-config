@@ -159,7 +159,7 @@ class Option(models.Model):
         unique_together = ('content_type','object_id','name')
 
     def __unicode__(self):
-        return u"%s %s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
+        return u"%s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
 
     @property
     def cache_key(self):
