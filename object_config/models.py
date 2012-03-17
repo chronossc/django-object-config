@@ -55,7 +55,7 @@ class OptionManager(models.Manager):
             raise AttributeError,u"This method can't be called from a normal Manager. This method should be called from a GenericRelatedObjectManager, in other words, use mode.options.get_all_cached()"
 
         values = self.values_list('pk','content_type','object_id','name')
-        key_template='doc_arquivo__%s-%s-%s'
+        key_template='option__%s-%s-%s'
 
         result={}
 
@@ -153,23 +153,23 @@ class Option(models.Model):
 
     objects = OptionManager()
 
-    _key = None# doc_arquivo__content_type_id-object_id-name
-
-    @property
-    def cache_key(self):
-        if not self._key and self.content_type_id and self.object_id and self.name:
-            # if change how key is made CHANGE MANAGER TOO
-            self._key='doc_arquivo__%s-%s-%s' % (self.content_type_id,self.object_id,self.name)
-
-        if not self._key: return None
-
-        return self._key
+    _key = None # option__<content_type_id>-<object_id>-<opt_name>
 
     class Meta:
         unique_together = ('content_type','object_id','name')
 
     def __unicode__(self):
-        return u"doc_arquivo_%s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
+        return u"%s %s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
+
+    @property
+    def cache_key(self):
+        if not self._key and self.content_type_id and self.object_id and self.name:
+            # if change how key is made CHANGE MANAGER TOO
+            self._key='option__%s-%s-%s' % (self.content_type_id,self.object_id,self.name)
+
+        if not self._key: return None
+
+        return self._key
 
     def _get_value(self):
 
