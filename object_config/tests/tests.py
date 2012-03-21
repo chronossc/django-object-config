@@ -1,30 +1,14 @@
 # coding: utf-8
-"""
-This file demonstrates two different styles of tests (one doctest and one
-unittest). These will both pass when you run "manage.py test".
-
-Replace these with more appropriate tests for your application.
-"""
 from django.contrib.contenttypes import generic
 from django.core.cache import cache
 from django.db import models, IntegrityError
 from django.db.models import ObjectDoesNotExist
 from django.test import TestCase
 from object_config.models import Option, OPT_TYPES
+from .models import MyModel
 from decimal import Decimal
 import simplejson
 import datetime
-
-class SimpleTest(TestCase):
-    def test_basic_addition(self):
-        """
-        Tests that 1 + 1 always equals 2.
-        """
-        self.failUnlessEqual(1 + 1, 2)
-
-class MyModel(models.Model):
-    name = models.CharField(max_length=10)
-    options = generic.GenericRelation(Option,related_name='options')
 
 class OptionsTest(TestCase):
 
