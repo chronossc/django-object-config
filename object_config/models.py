@@ -1,5 +1,6 @@
 # coding: utf-8
 
+from django.conf import settings
 from django.core.cache import cache
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
@@ -55,12 +56,11 @@ class OptionManager(models.Manager):
             raise AttributeError,u"This method can't be called from a normal Manager. This method should be called from a GenericRelatedObjectManager, in other words, use mode.options.get_all_cached()"
 
         values = self.values_list('pk','content_type','object_id','name')
-        key_template='option__%s-%s-%s'
 
         result={}
 
         for pk,content_type_id,object_id,name in values:
-            key = key_template % (content_type_id,object_id,name)
+            key = self.cache_key_template % (content_type_id,object_id,name)
             if cache.has_key(key):
                 result[name]=cache.get(key)
             else:
@@ -153,7 +153,7 @@ class Option(models.Model):
 
     objects = OptionManager()
 
-    _key = None # option__<content_type_id>-<object_id>-<opt_name>
+
 
     class Meta:
         unique_together = ('content_type','object_id','name')
@@ -161,11 +161,32 @@ class Option(models.Model):
     def __unicode__(self):
         return u"%s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
 
+    _key = None
+    def _get_cache_key_template(self):
+        """
+        Returns the cache key template.
+        The base template is 'option__<content_type_id>-<object_id>-<opt_name>',
+        so, for your key template you should consider tree places to put 
+        content_type_id, object_id and opt_name.
+
+        To get a different cache key template you should overwrite this method
+        or configure a setting called OBJECT_CONFIG_CACHE_KEY_TEMPLATE.
+
+        It is really useful for Django < 1.3 that can't set CACHE_KEY_PREFIX
+        settings (https://docs.djangoproject.com/en/1.3/ref/settings/#key-prefix).
+        """
+        try:
+            return settings.OBJECT_CONFIG_CACHE_KEY_TEMPLATE
+        except AttributeError:
+            return 'option__%s-%s-%s'
+    cache_key_template = property(_get_cache_key_template)
+
+
     @property
     def cache_key(self):
         if not self._key and self.content_type_id and self.object_id and self.name:
             # if change how key is made CHANGE MANAGER TOO
-            self._key='option__%s-%s-%s' % (self.content_type_id,self.object_id,self.name)
+            self._key=self.cache_key_template % (self.content_type_id,self.object_id,self.name)
 
         if not self._key: return None
 
@@ -211,6 +232,7 @@ class Option(models.Model):
         else:
             self.opt_value = u"%s" % value
         self.save()
+        self._get_value() # this cache value again.
 
     value = property(_get_value,_set_value)
 

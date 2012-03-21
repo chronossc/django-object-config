@@ -4,7 +4,7 @@ from django.contrib.contenttypes import generic
 from object_config.models import Option
 
 # Create your models here.
-class Member(models.Model):
+class Profile(models.Model):
     user = models.OneToOneField(User)
     options = generic.GenericRelation(Option)
 
