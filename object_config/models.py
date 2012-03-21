@@ -162,8 +162,9 @@ class Option(models.Model):
         return u"%s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
 
     _key = None
+
     @classmethod
-    def get_cache_key_template(self):
+    def get_cache_key_template(cls,*args):
         """
         Returns the cache key template.
         The base template is 'option__<content_type_id>-<object_id>-<opt_name>',
