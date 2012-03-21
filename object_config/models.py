@@ -60,7 +60,7 @@ class OptionManager(models.Manager):
         result={}
 
         for pk,content_type_id,object_id,name in values:
-            key = self.cache_key_template % (content_type_id,object_id,name)
+            key = self.model.get_cache_key_template() % (content_type_id,object_id,name)
             if cache.has_key(key):
                 result[name]=cache.get(key)
             else:
@@ -162,7 +162,8 @@ class Option(models.Model):
         return u"%s:%s <%s>" % (self.content_object,self.name,self.get_type_display())
 
     _key = None
-    def _get_cache_key_template(self):
+    @classmethod
+    def get_cache_key_template(self):
         """
         Returns the cache key template.
         The base template is 'option__<content_type_id>-<object_id>-<opt_name>',
@@ -179,14 +180,13 @@ class Option(models.Model):
             return settings.OBJECT_CONFIG_CACHE_KEY_TEMPLATE
         except AttributeError:
             return 'option__%s-%s-%s'
-    cache_key_template = property(_get_cache_key_template)
 
 
     @property
     def cache_key(self):
         if not self._key and self.content_type_id and self.object_id and self.name:
             # if change how key is made CHANGE MANAGER TOO
-            self._key=self.cache_key_template % (self.content_type_id,self.object_id,self.name)
+            self._key=self.get_cache_key_template() % (self.content_type_id,self.object_id,self.name)
 
         if not self._key: return None
 
