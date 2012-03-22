@@ -143,4 +143,59 @@ Create each option with mymodel.options.create(..) is a pain in the ass, I know,
 
 ### Setting default options at object creation
 
-Personally I think that better way to work with options is create all options at post_save from (continue tomorrow...)
+Personally I think that better way to work with options is create all options at post_save from your model, than just query / set value.
+The **create_many** shortcut receive a list of dicts, this dicts you will write in your model, and on post\_save  signal, you will create the options. See the example:
+
+
+```python
+from django.db import models
+from django.db.models.signals import post_save
+from django.contrib.auth import User
+from django.contrib.contenttypes import generic
+from object_config.models import Option
+
+DEFAULT_PROFILE_OPTIONS = [
+    {
+        'name':'items_per_page',
+        'verbose_name':'Number of items per page',
+        'help_text':'Number of items showed per page.',
+        'type': 0, # integer
+        'default_value': 50
+    },
+    {
+        'name':'show_email_address',
+        'verbose_name':'Allow show your email address?',
+        'type': 5, # bool
+        'default_value': 'False'
+    },
+    {
+        'name':'show_phone_number',
+        'verbose_name':'Show your phone number on site',
+        'type': 5, # bool
+        'default_value': 'False'
+    }
+]
+
+class Profile(models.Model):
+    user = models.OneToOneField(User)
+    options = generic.GenericRelation(Option)
+
+def populate_profile_options(sender,instance,created,**kwargs):
+
+    if created:
+        instance.options.create_many(DEFAULT_PROFILE_OPTIONS)
+
+post_save.connect(populate_profile_options,sender=Profile)
+```
+
+After each Profile is created, this 3 default options will be created too:
+
+```python
+# short code
+Profile.objects.create(user=u1).options.get_all_cached()
+[out: {
+    'items_per_page': 50,
+    'show_email_address': False,
+    'show_phone_number': False
+}]
+```
